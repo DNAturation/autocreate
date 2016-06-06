@@ -4,6 +4,9 @@ import argparse
 import re
 import glob
 import multiprocessing
+import string
+from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
 
 
 
@@ -62,7 +65,7 @@ def run_prokka(prokkaout, prefix, genomes, reference, workdir):
 
     print ("\nRunning Prokka\n")
     prokargs= ('prokka',
-               '--outdir', workdir, prokkaout,
+               '--outdir', os.path.join(workdir, prokkaout),
                '--prefix', prefix,
                '--locustag', prefix,
                '--cpus', str(0),
@@ -108,11 +111,64 @@ def run_ava(scriptdir, prokkaout, prefix, workdir):
 ### Create .markers file for MIST ###
 def markers(prokkaout, prefix, workdir):
     print("\nSplitting to discrete fastas.\n")
-    markargs=('csplit', '--quiet',
-              '--prefix', '{}alleles/'.format(workdir),
-              '-z', os.path.join(workdir, prokkaout, prefix)+'.ffn',
-              '/>/', '{*}')
-    subprocess.call(markargs)
+    duplist = ['']+list(string.ascii_lowercase)
+    if not os.listdir('{}alleles/'.format(workdir)):
+        with open(workdir+prokkaout+prefix+'.ffn', 'r') as f:
+            for rec in SeqIO.parse(f, 'fasta'):
+                header = rec.id
+                sequence = rec.seq
+                for dup in duplist:
+                    if os.path.isfile('{}alleles/'.format(workdir)+header+'z.fasta'):
+                        print('Error, too many duplicate genes')
+                        subprocess.call(exit(1))
+                    elif os.path.isfile('{}alleles/'.format(workdir)+header+dup+'.fasta'):
+                        continue
+
+                    else:
+                        with open('{}alleles/'.format(workdir)+header+dup+'.fasta', 'w+') as g:
+                            g.seek(0)
+                            dat = g.readlines()
+                            g.seek(0)
+                            num = len(dat)/2
+                            line = '>{}\n'.format(int(num)+1)
+                            g.writelines(line)
+                            g.write(str(sequence).strip())
+                        break
+        # for item in d:
+        #     with open('{}alleles/'.format(workdir)+item+'.fasta', 'w') as f:
+        #         record = SeqRecord(d[item], id=1)
+        #         SeqIO.write(record, f, 'fasta')
+
+
+        # markargs=('csplit', '--quiet',
+        #           '--prefix', '{}alleles/'.format(workdir),
+        #           '-z', os.path.join(workdir, prokkaout, prefix)+'.ffn',
+        #           '/>/', '{*}')
+        # subprocess.call(markargs)
+        # for afile in os.listdir('{}alleles/'.format(workdir)):
+        #     with open ('{}alleles/'.format(workdir) + afile, 'r') as f:
+        #         lines = f.readlines()
+        #         fullname = lines[0]
+        #         name = fullname.split()[0][1:]
+        #
+        #
+        #         for line in lines:
+        #             with open ('{}alleles/'.format(workdir)+name+'.fasta', 'a+') as g:
+        #                 g.seek(0)
+        #                 dat = g.readlines()
+        #                 g.seek(0)
+        #                 if '>' in line:
+        #                     num = len(dat)/2
+        #                     if num == 0:
+        #                         line = '>{}\n'.format(int(num)+1)
+        #                         g.writelines(line)
+        #                     else:
+        #                         line = '\n>{}\n'.format(int(num)+1)
+        #                         g.writelines(line)
+        #                 else:
+        #                     g.writelines(line.strip())
+        #
+        #     os.remove('{}alleles/'.format(workdir) + afile)
 
 
 def renamer():
