@@ -6,7 +6,6 @@ import glob
 import multiprocessing
 import string
 from Bio import SeqIO
-from Bio.SeqRecord import SeqRecord
 
 
 
@@ -100,7 +99,7 @@ def run_ava(scriptdir, prokkaout, prefix, workdir):
     print("\nFiltering out homologues\n")
     if not os.access('{}blast_out/'.format(workdir), os.F_OK):
         os.mkdir('{}blast_out/'.format(workdir))
-    avargs=('python3', '{}/ava.py'.format(scriptdir),
+    avargs=('python', '{}/ava.py'.format(scriptdir),
             '--seq', os.path.join(workdir, prokkaout, prefix)+'.ffn',
             '--result', '{}blast_out/all_vs_all.csv'.format(workdir),
             '--out', '{}blast_out/non_redundant.fasta'.format(workdir))
@@ -171,15 +170,15 @@ def markers(prokkaout, prefix, workdir):
         #     os.remove('{}alleles/'.format(workdir) + afile)
 
 
-def renamer():
-    ls = glob.glob('alleles/*')
+def renamer(workdir):
+    ls = glob.glob('{}alleles/*'.format(workdir))
     for i in ls:
-        fasta_rename(i, 'alleles/')
+        fasta_rename(i, '{}alleles/'.format(workdir))
 
 
 def build(scriptdir, workdir):
     print("\nBuilding reference genome .markers file\n")
-    bargs = ('python3', os.path.join(workdir, scriptdir, 'marker_maker.py'),
+    bargs = ('python', os.path.join(workdir, scriptdir, 'marker_maker.py'),
              '--fastas', '{}alleles/'.format(workdir),
              '--out', '{}wgmlst.markers'.format(workdir),
              '--test', 'wgmlst')
@@ -188,14 +187,14 @@ def build(scriptdir, workdir):
 ### run MIST ###
 def run_mist(genomes, workdir):
     os.chdir(workdir)
-    pool = multiprocessing.Pool(int(multiprocessing.cpu_count()/2))
+    pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
     print("\nRunning MIST in parallel.\n")
     files = glob.glob(genomes+'*.fasta')
     for file in files:
 # A hack that will find the shortest path to MIST
     # The notion is that it won't accidentally find
     # debugging binaries buried in the project directory
-        mistargs = ('/usr/local/bin/MIST/MIST.exe',
+        mistargs = ('mist',
                  '-t', 'wgmlst.markers',
                  '-T', 'temp/',
                  '-a', 'alleles/',
@@ -208,8 +207,8 @@ def run_mist(genomes, workdir):
 ### Update allele definitions ###
 def update(scriptdir, workdir):
     print("\nUpdating allele definitions.\n")
-    # os.chdir(workdir)
-    upargs = ('python3', os.path.join(scriptdir, 'update_definitions.py'),
+    os.chdir(workdir)
+    upargs = ('python', os.path.join(scriptdir, 'update_definitions.py'),
               '--alleles', 'alleles/',
               '--jsons', 'jsons/',
               '--test', 'wgmlst')
@@ -218,8 +217,8 @@ def update(scriptdir, workdir):
 ### Align genes with clustalo ###
 def align(workdir):
     print("\nAligning genes.\n")
-    # os.chdir(workdir)
-    pool = multiprocessing.Pool(int(multiprocessing.cpu_count()/2))
+    os.chdir(workdir)
+    pool = multiprocessing.Pool(int(multiprocessing.cpu_count()))
     pathlist = glob.glob('alleles/*.fasta')
     for path in pathlist:
         alargs = ('clustalo',
@@ -232,17 +231,20 @@ def align(workdir):
 ### Divide Reference-based calls into core, genome, accessory schemes ###
 def divvy(scriptdir, workdir, prefix):
     print("\nParsing JSONs.\n")
-    # os.chdir(workdir)
-    aargs=('python3', os.path.join(scriptdir, 'json2csv.py'),
+    os.chdir(workdir)
+    aargs=('python', os.path.join(scriptdir, 'json2csv.py'),
              '--jsons', 'jsons/',
              '--test', 'wgmlst',
              '--out', prefix+'_calls.csv')
-    subprocess.call(aargs)
+    subprocess.call(aargs) #creates reference_calls.csv for use in bargs
     print("\nDividing markers into core and accessory schemes.\n")
     bargs=('Rscript', os.path.join(scriptdir, 'divide_schemes.R'),
            prefix+'_calls.csv', 'wgmlst.markers')
-    subprocess.call(bargs)
+    subprocess.call(bargs) #creates the core.markers file
     print("\nScript complete at `date`\n")
+    #NOTE: json2csv generates different flags based on contig truncation, marker match, and blast results,
+    # Currently, correct markmermatch = false should not pass through to this step, therefore the divide_schemes.R script
+    #does not take it into account when separating into core and accessory genomes
 
 
 def main():
@@ -257,11 +259,11 @@ def main():
     run_blastn(args.prokkaout, prefix, args.workdir)
     run_ava(SCRIPT_DIR, args.prokkaout, prefix, args.workdir)
     markers(args.prokkaout, prefix, args.workdir)
-    renamer()
+    renamer(args.workdir)
     build(SCRIPT_DIR, args.workdir)
     run_mist(args.genomes, args.workdir)
     update(SCRIPT_DIR, args.workdir)
-    align(args.workdir)
+    # align(args.workdir)
     divvy(SCRIPT_DIR, args.workdir, prefix)
 
 if __name__ == '__main__':

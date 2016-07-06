@@ -69,50 +69,50 @@ def update(json_dir, known_alleles, test):
     """
 
     for fname in os.listdir(json_dir):
-
+        
         json_name = os.path.join(json_dir, fname)
-        with open(json_name, 'r') as f:
-            data = json.load(f)
-            genes = data["Results"][0]["TestResults"][test]
+        data = load_data(json_name)
 
-            for g in genes:
+        genes = data["Results"][0]["TestResults"][test]
 
-                gene = genes[g]
+        for g in genes:
+            
+            gene = genes[g]
 
-                if gene["BlastResults"] != None \
-                        and not gene["CorrectMarkerMatch"] \
-                        and not gene["IsContigTruncation"]:
-                    br = gene["BlastResults"]
+            if gene["BlastResults"] != None \
+                    and not gene["CorrectMarkerMatch"] \
+                    and not gene["IsContigTruncation"]:
+                br = gene["BlastResults"]
 
-                    sj = br["SubjAln"].replace('-', '')
+                sj = br["SubjAln"].replace('-', '')
+                
+                br["QueryAln"] = sj 
+                br["SubjAln"] = sj 
+                
+                if sj not in known_alleles[g]: 
+                    known_alleles[g].append(sj)
 
-                    br["QueryAln"] = sj
-                    br["SubjAln"] = sj
+                br["Mismatches"] = 0
+                br["Gaps"] = 0
+                br["PercentIdentity"] = 100.0
+                gene["Mismatches"] = 0
+                gene["BlastPercentIdentity"] = 100.0
+                gene["CorrectMarkerMatch"] = True
 
-                    if sj not in known_alleles[g]:
-                        known_alleles[g].append(sj)
+                gene["MarkerCall"] = str(known_alleles[g].index(sj) + 1)
+                gene["AlleleMatch"] = gene["MarkerCall"]
+                
+                gene["BlastResults"] = br
+                genes[g] = gene
+        
+            data["Results"][0]["TestResults"][test] = genes
+            
+        
+        with open(json_name, 'w') as f:
+            json.dump(data, f, indent = 4,
+                      separators = (',', ': '), sort_keys = True)
 
-                    br["Mismatches"] = 0
-                    br["Gaps"] = 0
-                    br["PercentIdentity"] = 100.0
-                    gene["Mismatches"] = 0
-                    gene["BlastPercentIdentity"] = 100.0
-                    gene["CorrectMarkerMatch"] = True
-
-                    gene["MarkerCall"] = str(known_alleles[g].index(sj) + 1)
-                    gene["AlleleMatch"] = gene["MarkerCall"]
-
-                    gene["BlastResults"] = br
-                    genes[g] = gene
-
-                data["Results"][0]["TestResults"][test] = genes
-
-
-            with open(json_name, 'w') as f:
-                json.dump(data, f, indent = 4,
-                          separators = (',', ': '), sort_keys = True)
-
-        return known_alleles
+    return known_alleles
 
 def main():
 

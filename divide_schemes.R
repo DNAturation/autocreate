@@ -6,7 +6,7 @@ divide_calls <- function(fname) {
 
     find_missing_genes <- function(name) {
 
-        perc_missing <- sum(which(calls[,name] == '0')) / length(calls[,name])
+        perc_missing <- sum(which(calls[,name] == '0'), which(calls[,name] == '-1')) / length(calls[,name])
         if (perc_missing > 0.01) {
             TRUE
         }

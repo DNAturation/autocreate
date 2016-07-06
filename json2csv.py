@@ -41,7 +41,7 @@ def allele_calls(genes):
         
         elif genes[gene]['CorrectMarkerMatch'] is False:
             calls[gene] = '?'
-
+            print("WARNING, '?'s are present, did you run update_definitions.py?")
         else:
             calls[gene] = genes[gene]['MarkerCall']
 
